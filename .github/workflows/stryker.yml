@@ -1,0 +1,14 @@
+- task: DotNetCoreCLI@2
+  displayName: 'Install dotnet-stryker'
+  inputs:
+      command: custom
+      custom: tool
+      arguments: install dotnet-stryker --tool-path $(Agent.BuildDirectory)/tools
+
+- task: Powershell@2
+  displayName: 'Run dotnet-stryker'
+  inputs:
+      workingDirectory: <test-project-folder-here>
+      targetType: 'inline'
+      pwsh: true
+      script: $(Agent.BuildDirectory)/tools/dotnet-stryker
