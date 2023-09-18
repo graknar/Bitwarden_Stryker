@@ -61,9 +61,6 @@ jobs:
         run: dotnet restore --locked-mode
         shell: pwsh
 
-      - name: Remove SQL proj
-        run: dotnet sln bitwarden-server.sln remove src/Sql/Sql.sqlproj
-
       - name: Build OSS solution
         run: dotnet build bitwarden-server.sln -p:Configuration=Debug -p:DefineConstants="OSS" --verbosity minimal
         shell: pwsh
@@ -88,6 +85,45 @@ jobs:
           path: "**/*-test-results.trx"
           reporter: dotnet-trx
           fail-on-error: true
+
+  stryker:
+    name: Stryker
+    runs-on: ubuntu-22.04
+    env:
+      NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3.5.3
+
+      - name: Set up dotnet
+        uses: actions/setup-dotnet@3447fd6a9f9e57506b15f895c5b76d3b197dc7c2 # v3.2.0
+
+      - name: Install dotnet-stryker
+        run: dotnet tool install -g dotnet-stryker
+
+      - name: Restore
+        run: dotnet restore --locked-mode
+        shell: pwsh
+        
+      - name: Build OSS solution
+        run: dotnet build bitwarden-server.sln -p:Configuration=Debug -p:DefineConstants="OSS" --verbosity minimal
+        shell: pwsh
+
+      - name: Build solution
+        run: dotnet build bitwarden-server.sln -p:Configuration=Debug --verbosity minimal
+        shell: pwsh
+
+      - name: Run Stryker
+        run: |
+          dotnet stryker
+        shell: pwsh
+
+      # - name: Upload project artifact
+      #   uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce # v3.1.2
+      #   with:
+      #     name: ${{ matrix.project_name }}.zip
+      #     path: ${{ matrix.base_path }}/${{ matrix.project_name }}/${{ matrix.project_name }}.zip
+      #     if-no-files-found: error
 
 #   build-artifacts:
 #     name: Build artifacts
