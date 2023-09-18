@@ -5,6 +5,7 @@
       "progress",
       "html"
     ],
-    "verbosity": "debug"
+    "verbosity": "debug",
+    "thresholds": { "high": 90, "low": 50, "break": 10 }
   }
 }

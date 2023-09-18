@@ -113,16 +113,15 @@ jobs:
         shell: pwsh
 
       - name: Run Stryker
-        run: |
-          dotnet stryker
+        run: dotnet stryker --output="${{ github.workspace }}/StrykerOutput" --log-to-file
         shell: pwsh
 
-      # - name: Upload project artifact
-      #   uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce # v3.1.2
-      #   with:
-      #     name: ${{ matrix.project_name }}.zip
-      #     path: ${{ matrix.base_path }}/${{ matrix.project_name }}/${{ matrix.project_name }}.zip
-      #     if-no-files-found: error
+      - name: Upload project artifact
+        uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce # v3.1.2
+        with:
+          name: stryker-report
+          path: ${{ github.workspace }}/StrykerOutput/**/reports/mutation-report.html
+          if-no-files-found: error
 
 #   build-artifacts:
 #     name: Build artifacts
