@@ -1,97 +1,93 @@
-# ---
-# name: Build
+---
+name: Build
 
-# on:
-#   push:
-#     branches-ignore:
-#       - "l10n_master"
-#       - "gh-pages"
-#     paths-ignore:
-#       - ".github/workflows/**"
-#   workflow_dispatch:
+on:
+  push:
+    branches-ignore:
+      - "l10n_master"
+      - "gh-pages"
+    paths-ignore:
+      - ".github/workflows/**"
 
-# env:
-#   _AZ_REGISTRY: "bitwardenprod.azurecr.io"
+jobs:
+  cloc:
+    name: CLOC
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3.5.3
 
-# jobs:
-#   cloc:
-#     name: CLOC
-#     runs-on: ubuntu-22.04
-#     steps:
-#       - name: Checkout repo
-#         uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3.5.3
+      - name: Install cloc
+        run: |
+          sudo apt-get update
+          sudo apt-get -y install cloc
 
-#       - name: Install cloc
-#         run: |
-#           sudo apt-get update
-#           sudo apt-get -y install cloc
+      - name: Print lines of code
+        run: cloc --include-lang C#,SQL,Razor,"Bourne Shell",PowerShell,HTML,CSS,Sass,JavaScript,TypeScript --vcs git
 
-#       - name: Print lines of code
-#         run: cloc --include-lang C#,SQL,Razor,"Bourne Shell",PowerShell,HTML,CSS,Sass,JavaScript,TypeScript --vcs git
+  lint:
+    name: Lint
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3.5.3
 
-#   lint:
-#     name: Lint
-#     runs-on: ubuntu-22.04
-#     steps:
-#       - name: Checkout repo
-#         uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3.5.3
+      - name: Set up dotnet
+        uses: actions/setup-dotnet@3447fd6a9f9e57506b15f895c5b76d3b197dc7c2 # v3.2.0
 
-#       - name: Set up dotnet
-#         uses: actions/setup-dotnet@3447fd6a9f9e57506b15f895c5b76d3b197dc7c2 # v3.2.0
+      - name: Verify Format
+        run: dotnet format --verify-no-changes
 
-#       - name: Verify Format
-#         run: dotnet format --verify-no-changes
+  testing:
+    name: Testing
+    runs-on: ubuntu-22.04
+    env:
+      NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3.5.3
 
-#   testing:
-#     name: Testing
-#     runs-on: ubuntu-22.04
-#     env:
-#       NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
-#     steps:
-#       - name: Checkout repo
-#         uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3.5.3
+      - name: Set up dotnet
+        uses: actions/setup-dotnet@3447fd6a9f9e57506b15f895c5b76d3b197dc7c2 # v3.2.0
 
-#       - name: Set up dotnet
-#         uses: actions/setup-dotnet@3447fd6a9f9e57506b15f895c5b76d3b197dc7c2 # v3.2.0
+      - name: Print environment
+        run: |
+          dotnet --info
+          nuget help | grep Version
+          echo "GitHub ref: $GITHUB_REF"
+          echo "GitHub event: $GITHUB_EVENT"
 
-#       - name: Print environment
-#         run: |
-#           dotnet --info
-#           nuget help | grep Version
-#           echo "GitHub ref: $GITHUB_REF"
-#           echo "GitHub event: $GITHUB_EVENT"
+      - name: Restore
+        run: dotnet restore --locked-mode
+        shell: pwsh
 
-#       - name: Restore
-#         run: dotnet restore --locked-mode
-#         shell: pwsh
+      - name: Remove SQL proj
+        run: dotnet sln bitwarden-server.sln remove src/Sql/Sql.sqlproj
 
-#       - name: Remove SQL proj
-#         run: dotnet sln bitwarden-server.sln remove src/Sql/Sql.sqlproj
+      - name: Build OSS solution
+        run: dotnet build bitwarden-server.sln -p:Configuration=Debug -p:DefineConstants="OSS" --verbosity minimal
+        shell: pwsh
 
-#       - name: Build OSS solution
-#         run: dotnet build bitwarden-server.sln -p:Configuration=Debug -p:DefineConstants="OSS" --verbosity minimal
-#         shell: pwsh
+      - name: Build solution
+        run: dotnet build bitwarden-server.sln -p:Configuration=Debug --verbosity minimal
+        shell: pwsh
 
-#       - name: Build solution
-#         run: dotnet build bitwarden-server.sln -p:Configuration=Debug --verbosity minimal
-#         shell: pwsh
+      - name: Test OSS solution
+        run: dotnet test ./test --configuration Debug --no-build --logger "trx;LogFileName=oss-test-results.trx"
+        shell: pwsh
 
-#       - name: Test OSS solution
-#         run: dotnet test ./test --configuration Debug --no-build --logger "trx;LogFileName=oss-test-results.trx"
-#         shell: pwsh
+      - name: Test Bitwarden solution
+        run: dotnet test ./bitwarden_license/test --configuration Debug --no-build --logger "trx;LogFileName=bw-test-results.trx"
+        shell: pwsh
 
-#       - name: Test Bitwarden solution
-#         run: dotnet test ./bitwarden_license/test --configuration Debug --no-build --logger "trx;LogFileName=bw-test-results.trx"
-#         shell: pwsh
-
-#       - name: Report test results
-#         uses: dorny/test-reporter@c9b3d0e2bd2a4e96aaf424dbaa31c46b42318226 # v1.6.0
-#         if: always()
-#         with:
-#           name: Test Results
-#           path: "**/*-test-results.trx"
-#           reporter: dotnet-trx
-#           fail-on-error: true
+      - name: Report test results
+        uses: dorny/test-reporter@c9b3d0e2bd2a4e96aaf424dbaa31c46b42318226 # v1.6.0
+        if: always()
+        with:
+          name: Test Results
+          path: "**/*-test-results.trx"
+          reporter: dotnet-trx
+          fail-on-error: true
 
 #   build-artifacts:
 #     name: Build artifacts
